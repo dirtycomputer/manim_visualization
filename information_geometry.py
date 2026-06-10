@@ -473,11 +473,11 @@ class FisherMetricScene(IG3DScene):
 
 
 class GeodesicScene(IG3DScene):
-    COST_K = 0.55
+    COST_K = 0.8
 
     def construct(self):
         self.setup_voice()
-        self.set_camera_orientation(phi=62 * DEGREES, theta=-95 * DEGREES,
+        self.set_camera_orientation(phi=65 * DEGREES, theta=-95 * DEGREES,
                                     zoom=0.9)
 
         head = make_heading("四、测地线：分布之间的最短路径",
@@ -495,61 +495,74 @@ class GeodesicScene(IG3DScene):
         def cost(s):
             return self.COST_K / s
 
-        terrain = Surface(
-            lambda u, v: axes.c2p(u, v, cost(v)),
-            u_range=[-3, 3], v_range=[0.28, 2.3],
-            resolution=(28, 22),
-            checkerboard_colors=[GREY_D, GREY_E],
-            fill_opacity=0.45, stroke_color=C_GREY, stroke_width=0.4,
-        )
-        terr_note = Text("高度 = 移动单位参数的信息成本（∝ 1/σ）",
+        cost_note = Text("每走一小步，按 1/σ 的“汇率”付信息成本",
                          font=CJK, font_size=24, color=C_GREY)
-        terr_note.to_edge(DOWN, buff=0.35)
-        self.fix(terr_note)
+        cost_note.to_edge(DOWN, buff=0.35).shift(LEFT * 1.6)
+        self.fix(cost_note)
 
         with self.voiceover(
             text="有了度量，就可以问一个几何学最经典的问题：两个分布之间的"
-                 "最短路径——测地线——长什么样？这次我们把尺子的长度画成"
-                 "三维地形：高度代表移动单位参数所要付出的信息成本。"
-                 "标准差越小的地方成本越高，像一面陡峭的山壁。"
+                 "最短路径——测地线——长什么样？记住规则：在参数平面上"
+                 "每走一小步，都要按一比西格玛的汇率付出信息成本，"
+                 "越靠近底部，代价越贵。"
         ):
             self.play(FadeIn(head, shift=DOWN * 0.2))
             self.play(Create(axes), FadeIn(xlab), FadeIn(ylab), run_time=1.5)
-            self.play(Create(terrain), FadeIn(terr_note), run_time=3)
+            self.play(FadeIn(cost_note))
 
-        # 两个端点分布
+        # 两个端点分布（位于地面 z=0 的参数平面上）
         muA, sA = -2.0, 0.6
         muB, sB = 2.0, 0.6
 
-        def lift(m, s):
-            return axes.c2p(m, s, cost(s) + 0.03)
+        def ground(m, s):
+            return axes.c2p(m, s, 0)
 
-        dotA = Dot3D(lift(muA, sA), color=C_BLUE, radius=0.09)
-        dotB = Dot3D(lift(muB, sB), color=C_PINK, radius=0.09)
+        dotA = Dot3D(ground(muA, sA), color=C_BLUE, radius=0.09)
+        dotB = Dot3D(ground(muB, sB), color=C_PINK, radius=0.09)
         labAB = MathTex(r"\mathcal{N}(-2,\,0.6^2)\ \longleftrightarrow\ "
                         r"\mathcal{N}(2,\,0.6^2)",
                         font_size=30, color=WHITE).to_corner(UL, buff=0.4).shift(DOWN * 1.2)
         self.fix(labAB)
         with self.voiceover(
             text="比如这两个高斯分布：均值一个在负二，一个在正二，"
-                 "标准差都是零点六——它们都站在山壁的半山腰上。"
+                 "标准差都是零点六。"
         ):
             self.play(FadeIn(dotA, scale=0.5), FadeIn(dotB, scale=0.5),
                       Write(labAB))
 
-        # 欧氏直线：沿山腰高处横切
+        def wall(path_fn, color, opacity):
+            """沿路径把单位成本 1/σ 竖成一面“成本墙”，面积≈信息长度。"""
+            return Surface(
+                lambda t, h: axes.c2p(
+                    path_fn(t)[0], path_fn(t)[1],
+                    h * cost(path_fn(t)[1]),
+                ),
+                u_range=[0, 1], v_range=[0, 1],
+                resolution=(40, 6),
+                fill_opacity=opacity, fill_color=color,
+                checkerboard_colors=False,
+                stroke_color=color, stroke_width=0.5,
+            )
+
+        # 欧氏直线 + 它的成本墙
+        def straight_path(t):
+            return muA + (muB - muA) * t, sA
+
         straight = DashedVMobject(ParametricFunction(
-            lambda t: lift(muA + (muB - muA) * t, sA),
+            lambda t: ground(*straight_path(t)),
             t_range=[0, 1], stroke_width=4,
         ), num_dashes=40).set_color(RED)
-        lab_s = Text("欧氏直线：贴着高成本山脊走", font=CJK, font_size=23,
+        wall_s = wall(straight_path, RED, 0.35)
+        lab_s = Text("欧氏直线：成本墙又高又平", font=CJK, font_size=23,
                      color=RED).to_corner(UR, buff=0.4).shift(DOWN * 1.2)
         self.fix(lab_s)
         with self.voiceover(
-            text="欧氏直觉告诉我们走直线——但那意味着一路贴着"
-                 "高成本的山脊行走。"
+            text="欧氏直觉告诉我们走直线。把沿途每一步的成本竖起来，"
+                 "就得到一面墙——墙的面积就是路径的信息长度。"
+                 "直线始终待在标准差零点六的昂贵地带，墙又高又平。"
         ):
             self.play(Create(straight), FadeIn(lab_s))
+            self.play(Create(wall_s), run_time=2.5)
 
         # Fisher 测地线：在 u = μ/√2 坐标下是半圆
         uA, uB = muA / np.sqrt(2), muB / np.sqrt(2)
@@ -565,18 +578,21 @@ class GeodesicScene(IG3DScene):
             return u * np.sqrt(2), s
 
         geodesic = ParametricFunction(
-            lambda t: lift(*geo_point(t)),
+            lambda t: ground(*geo_point(t)),
             t_range=[0, 1], color=C_YELLOW, stroke_width=5,
         )
-        lab_g = Text("Fisher 测地线：下到低成本的谷地", font=CJK,
+        wall_g = wall(geo_point, C_YELLOW, 0.5)
+        lab_g = Text("Fisher 测地线：墙在中段更矮", font=CJK,
                      font_size=23, color=C_YELLOW)
-        lab_g.next_to(lab_s, DOWN, buff=0.15)
+        lab_g.next_to(lab_s, DOWN, buff=0.15, aligned_edge=RIGHT)
         self.fix(lab_g)
         with self.voiceover(
-            text="而 Fisher 度量下真正的最短路径，会先下到山谷——"
-                 "也就是标准差更大的区域——再爬回来。"
+            text="而 Fisher 度量下真正的最短路径会向上绕——先把标准差变大，"
+                 "再降回来。它的成本墙在中段明显更矮，总面积更小："
+                 "这条弧线才是真正的捷径。"
         ):
-            self.play(Create(geodesic), FadeIn(lab_g), run_time=2.5)
+            self.play(Create(geodesic), run_time=1.5)
+            self.play(Create(wall_g), FadeIn(lab_g), run_time=2.5)
 
         # 右下角固定小图：沿测地线插值出的分布
         inset = Axes(
@@ -598,21 +614,14 @@ class GeodesicScene(IG3DScene):
                               stroke_width=4)
 
         inset_curve = inset_graph()
-        sigma_read = DecimalNumber(sA, num_decimal_places=2, font_size=28,
-                                   color=WHITE)
-        sigma_lab = MathTex(r"\sigma =", font_size=28, color=WHITE)
-        sigma_grp = VGroup(sigma_lab, sigma_read).arrange(RIGHT, buff=0.12)
-        sigma_grp.next_to(inset_bg, LEFT, buff=0.25)
 
         moving = always_redraw(lambda: Dot3D(
-            lift(*geo_point(t_tr.get_value())), color=WHITE, radius=0.1,
+            ground(*geo_point(t_tr.get_value())), color=WHITE, radius=0.1,
         ))
 
         self.add_fixed_in_frame_mobjects(inset_bg, inset, inset_title,
-                                         inset_curve, sigma_grp)
+                                         inset_curve)
         inset_curve.add_updater(lambda m: m.become(inset_graph()))
-        sigma_read.add_updater(
-            lambda d: d.set_value(geo_point(t_tr.get_value())[1]))
 
         with self.voiceover(
             text="沿着测地线走一遍，右下角实时显示路径上的分布："
@@ -622,22 +631,20 @@ class GeodesicScene(IG3DScene):
             self.play(t_tr.animate.set_value(1.0), run_time=6,
                       rate_func=double_smooth)
 
-        note2 = Text("绕道高 σ 的谷地更“便宜”—— 因为那里的尺子更长",
+        note2 = Text("绕道高 σ 区域更“便宜”—— 因为那里的尺子更长",
                      font=CJK, font_size=26, color=C_GREEN)
         note2.to_edge(DOWN, buff=0.35)
         self.fix(note2)
         with self.voiceover(
-            text="为什么要绕道？因为高西格玛区域的尺子更长，在那里移动"
-                 "更便宜。欧氏直线翻越的是成本的山脊，测地线选择了"
-                 "成本的山谷。这就是双曲几何的智慧。"
+            text="为什么绕道反而更短？因为高西格玛区域的尺子更长，"
+                 "在那里移动更便宜。这就是双曲几何的智慧。"
         ):
             self.play(t_tr.animate.set_value(0.0), run_time=4,
                       rate_func=smooth)
-            self.play(FadeOut(terr_note), FadeIn(note2))
+            self.play(FadeOut(cost_note), FadeIn(note2))
 
         self.wait(0.5)
         inset_curve.clear_updaters()
-        sigma_read.clear_updaters()
         self.play(*[FadeOut(m) for m in self.mobjects], run_time=1)
 
 
