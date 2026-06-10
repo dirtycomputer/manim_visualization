@@ -1,2 +1,5 @@
 manim>=0.20
+manim-voiceover[gtts]>=0.3.7
 numpy
+# manim-voiceover 仍依赖 pkg_resources（setuptools>=81 已移除）
+setuptools<81

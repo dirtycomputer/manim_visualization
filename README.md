@@ -1,7 +1,8 @@
 # 信息几何可视化讲解视频 (Information Geometry with Manim)
 
-用 [Manim Community](https://www.manim.community/) 制作的中文讲解视频，
-约 4 分半，介绍信息几何的核心思想。
+用 [Manim Community](https://www.manim.community/) +
+[Manim Voiceover](https://voiceover.manim.community/) 制作的中文讲解视频
+（含 gTTS 合成的中文旁白），介绍信息几何的核心思想。
 
 ## 视频结构
 
@@ -26,6 +27,12 @@ pip install -r requirements.txt
 ```
 
 中文文本使用 `Noto Sans CJK SC` 字体，请确保已安装（`fonts-noto-cjk`）。
+
+旁白由 [gTTS](https://gtts.readthedocs.io/)（Google 翻译的在线 TTS）合成，
+**渲染时需要联网**。已合成的语音会缓存在 `media/voiceovers/` 下，
+重复渲染不会重复请求。如想换音色，可在 `IGScene.setup_voice` 中
+把 `GTTSService` 替换成 Azure / OpenAI / ElevenLabs 等其他
+[语音服务](https://voiceover.manim.community/en/latest/services.html)。
 
 ## 渲染
 
