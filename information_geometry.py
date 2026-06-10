@@ -156,7 +156,9 @@ class ManifoldScene(IG3DScene):
             text="固定一组参数，就得到一条密度曲线。参数空间中的每一个点，"
                  "都对应一个这样的完整分布。改变均值，曲线就沿着参数轴滑动。"
         ):
-            self.play(Create(fam_curve()), run_time=1)
+            curve0 = fam_curve()
+            self.play(Create(curve0), run_time=1)
+            self.remove(curve0)
             self.add(curve)
             self.play(mu_tr.animate.set_value(2.0), run_time=4,
                       rate_func=there_and_back)
